@@ -198,7 +198,11 @@
       <button id="cerrarModal" class="text-slate-400"><i data-lucide="x" class="w-6"></i></button>
     </h2>
     <div class="space-y-3 mt-3">
-      <input type="number" id="montoGasto" placeholder="Monto (negativo = gasto)" class="input-slate" step="0.01">
+      <div class="flex gap-2">
+        <button id="tipoGasto" data-tipo="gasto" class="flex-1 py-2 rounded-2xl font-semibold text-sm bg-red-600 text-white">💸 Gasto</button>
+        <button id="tipoIngreso" data-tipo="ingreso" class="flex-1 py-2 rounded-2xl font-semibold text-sm bg-slate-700 text-slate-400">💰 Ingreso</button>
+      </div>
+      <input type="number" id="montoGasto" placeholder="Monto" class="input-slate" step="0.01" min="0">
       <select id="cuentaGasto" class="input-slate"></select>
       <select id="categoriaGasto" class="input-slate"><option value="">Sin categoría</option></select>
       <input type="text" id="notaGasto" placeholder="Nota (opcional)" class="input-slate">
@@ -548,9 +552,20 @@
   function doLogout() { clearSession(); showScreen('login'); initGoogleLogin(); }
   document.getElementById('btnLogout').addEventListener('click', doLogout);
 
-  // ── Modal gasto ───────────────────────────────────────
+  // ── Modal movimiento ──────────────────────────────────
   const modal = document.getElementById('modalGasto');
-  document.getElementById('abrirModalGasto').addEventListener('click', () => modal.style.display = 'flex');
+  let tipoMovimiento = 'gasto';
+
+  function setTipo(tipo) {
+    tipoMovimiento = tipo;
+    document.getElementById('tipoGasto').className   = `flex-1 py-2 rounded-2xl font-semibold text-sm ${tipo === 'gasto'   ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-400'}`;
+    document.getElementById('tipoIngreso').className = `flex-1 py-2 rounded-2xl font-semibold text-sm ${tipo === 'ingreso' ? 'bg-green-600 text-white' : 'bg-slate-700 text-slate-400'}`;
+  }
+
+  document.getElementById('tipoGasto').addEventListener('click', () => setTipo('gasto'));
+  document.getElementById('tipoIngreso').addEventListener('click', () => setTipo('ingreso'));
+
+  document.getElementById('abrirModalGasto').addEventListener('click', () => { setTipo('gasto'); modal.style.display = 'flex'; lucide.createIcons(); });
   document.getElementById('cerrarModal').addEventListener('click', cerrarModal);
   window.addEventListener('click', e => { if (e.target === modal) cerrarModal(); });
 
@@ -563,6 +578,7 @@
     document.getElementById('archivoGasto').value = '';
     document.getElementById('montoGasto').value = '';
     document.getElementById('notaGasto').value = '';
+    setTipo('gasto');
   }
 
   let latCapturado = null, lngCapturado = null;
@@ -582,7 +598,8 @@
     const btn = document.getElementById('guardarGastoBtn');
     const btnText = document.getElementById('guardarBtnText');
     const errEl = document.getElementById('errorGasto');
-    const monto = parseFloat(document.getElementById('montoGasto').value);
+    const montoRaw = Math.abs(parseFloat(document.getElementById('montoGasto').value));
+    const monto = tipoMovimiento === 'gasto' ? -montoRaw : montoRaw;
     const account_id  = document.getElementById('cuentaGasto').value;
     const category_id = document.getElementById('categoriaGasto').value;
     const nota = document.getElementById('notaGasto').value.trim();
