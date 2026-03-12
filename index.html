@@ -67,6 +67,12 @@
     <p class="text-center text-slate-300 mb-4">Entra con tu cuenta de Google</p>
     <div id="google-btn" class="flex justify-center"></div>
     <p id="login-error" class="text-red-400 text-xs text-center mt-3 hidden"></p>
+    <hr class="border-slate-700 my-4">
+    <p class="text-center text-xs text-slate-500 mb-2">¿Te invitaron a un hogar compartido?</p>
+    <div class="flex gap-2">
+      <input type="text" id="joinCode" placeholder="Código de 8 letras" class="input-slate text-center uppercase tracking-widest text-sm" style="padding:.6rem .8rem">
+      <button id="btnJoin" class="btn-outline text-sm px-4 whitespace-nowrap">Unirse</button>
+    </div>
   </div>
 </div>
 
@@ -173,6 +179,21 @@
         <h2 class="font-medium mb-3">Mis cuentas</h2>
         <div id="listaCuentas" class="space-y-2 text-sm"></div>
       </div>
+      <div class="card">
+        <h2 class="font-medium mb-2">Hogar compartido</h2>
+        <div id="listaMembers" class="text-sm text-slate-400 mb-3"></div>
+        <button id="btnInvitar" class="btn-outline w-full flex items-center justify-center gap-2">
+          <i data-lucide="user-plus" class="w-4 h-4"></i> Invitar a mi esposa / pareja
+        </button>
+        <div id="inviteResult" class="mt-3 hidden">
+          <p class="text-xs text-slate-400 mb-1">Comparte este código de invitación:</p>
+          <div class="flex gap-2 items-center">
+            <span id="inviteCode" class="font-mono text-xl text-blue-400 tracking-widest bg-slate-900 px-4 py-2 rounded-xl flex-1 text-center"></span>
+            <button id="copiarCodigo" class="btn-outline text-sm px-3">Copiar</button>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">La otra persona entra a la app y usa "Unirse con código"</p>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -254,6 +275,7 @@
 
   // ── Google Login ──────────────────────────────────────
   window.handleGoogleCredential = async function(response) {
+    pendingJoinCredential = response.credential; // guardar por si quiere unirse
     try {
       const res  = await fetch(API_URL + '/api/auth/google', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -343,6 +365,8 @@
     window.NixState.transactions = txRes?.transactions  || [];
     document.getElementById('statusConexion').textContent = 'D1 conectado ✓';
     populateSelects(); refreshSaldos(); renderTransacciones(); renderCuentas();
+    // Cargar miembros del hogar
+    apiFetch('/api/me').then(r => { if (r?.household?.members) renderMembers(r.household.members); }).catch(()=>{});
   }
 
   function populateSelects() {
@@ -587,6 +611,50 @@
       resultEl.textContent = '❌ ' + err.message;
       resultEl.className = 'text-xs text-red-400 mt-2';
     } finally { btn.disabled = false; }
+  });
+
+  // ── Invitar al hogar ──────────────────────────────────
+  document.getElementById('btnInvitar').addEventListener('click', async () => {
+    try {
+      const res = await apiFetch('/api/invite', { method: 'POST' });
+      document.getElementById('inviteCode').textContent = res.code;
+      document.getElementById('inviteResult').classList.remove('hidden');
+    } catch (err) { showToast('❌ ' + err.message, 'text-red-400'); }
+  });
+
+  document.getElementById('copiarCodigo').addEventListener('click', () => {
+    const code = document.getElementById('inviteCode').textContent;
+    navigator.clipboard.writeText(code).then(() => showToast('✅ Código copiado'));
+  });
+
+  function renderMembers(members) {
+    document.getElementById('listaMembers').innerHTML = members.map(m =>
+      `<div class="flex items-center gap-2 py-1">👤 <span>${m.name || m.email}</span></div>`
+    ).join('') || '<p class="text-slate-500 italic">Solo tú por ahora</p>';
+  }
+
+  // ── Unirse con código (login) ─────────────────────────
+  let pendingJoinCredential = null;
+
+  document.getElementById('btnJoin').addEventListener('click', async () => {
+    const code = document.getElementById('joinCode').value.trim();
+    if (!code) { showToast('⚠️ Ingresa el código', 'text-amber-400'); return; }
+    if (!pendingJoinCredential) {
+      showToast('⚠️ Primero inicia sesión con Google arriba', 'text-amber-400'); return; }
+    try {
+      const res = await fetch(API_URL + '/api/auth/join', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: pendingJoinCredential, code }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error);
+      saveSession(data.sessionToken, data.user);
+      await loadApp();
+      showScreen('app');
+    } catch (err) {
+      document.getElementById('login-error').textContent = err.message;
+      document.getElementById('login-error').classList.remove('hidden');
+    }
   });
 
   // ── Arrancar ──────────────────────────────────────────
