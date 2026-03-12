@@ -324,17 +324,32 @@
     lucide.createIcons();
   }
 
+  function saveOnboardingFromDOM() {
+    document.querySelectorAll('#onboarding-cuentas .card').forEach((card, i) => {
+      const inputs  = card.querySelectorAll('input');
+      const select  = card.querySelector('select');
+      if (inputs[0]) onboardingCuentas[i].name            = inputs[0].value;
+      if (select)    onboardingCuentas[i].type            = select.value;
+      if (inputs[1]) onboardingCuentas[i].initial_balance = parseFloat(inputs[1].value) || 0;
+    });
+  }
+
   window.removeOnboardingCuenta = function(i) {
-    onboardingCuentas.splice(i, 1); renderOnboarding();
+    saveOnboardingFromDOM();
+    onboardingCuentas.splice(i, 1);
+    renderOnboarding();
   };
 
   document.getElementById('onboarding-agregar').addEventListener('click', () => {
-    onboardingCuentas.push({ name: '', type: 'CASH', initial_balance: 0 }); renderOnboarding();
+    saveOnboardingFromDOM();
+    onboardingCuentas.push({ name: '', type: 'CASH', initial_balance: 0 });
+    renderOnboarding();
   });
 
   document.getElementById('onboarding-listo').addEventListener('click', async () => {
     const errEl   = document.getElementById('onboarding-error');
     const btn     = document.getElementById('onboarding-listo');
+    saveOnboardingFromDOM();
     const validas = onboardingCuentas.filter(c => c.name.trim());
     if (!validas.length) { errEl.textContent = 'Agrega al menos una cuenta'; errEl.classList.remove('hidden'); return; }
     errEl.classList.add('hidden');
