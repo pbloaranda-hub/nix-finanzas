@@ -234,7 +234,21 @@
         <option value="BANK">🏦 Cuenta banco</option>
         <option value="CREDIT_CARD">💳 Tarjeta de crédito</option>
       </select>
-      <input type="number" id="cuentaSaldo" placeholder="Saldo actual" class="input-slate" step="0.01">
+      <input type="number" id="cuentaSaldo" placeholder="Saldo disponible actual" class="input-slate" step="0.01">
+      <!-- Campos extra solo para TC -->
+      <div id="camposTarjeta" class="hidden space-y-3">
+        <input type="number" id="cuentaLimite" placeholder="Límite de crédito (ej: 50000)" class="input-slate" step="0.01">
+        <div class="flex gap-2">
+          <div class="flex-1">
+            <label class="text-xs text-slate-400 mb-1 block">Día de corte</label>
+            <input type="number" id="cuentaCorte" placeholder="Ej: 15" class="input-slate" min="1" max="31">
+          </div>
+          <div class="flex-1">
+            <label class="text-xs text-slate-400 mb-1 block">Día de pago</label>
+            <input type="number" id="cuentaPago" placeholder="Ej: 5" class="input-slate" min="1" max="31">
+          </div>
+        </div>
+      </div>
       <button id="guardarCuentaBtn" class="btn-primary w-full flex items-center justify-center gap-2">
         <i data-lucide="check" class="w-4 h-4"></i> <span id="guardarCuentaBtnText">Guardar</span>
       </button>
@@ -413,11 +427,31 @@
     document.getElementById('saldoCaja').textContent = fmt(totalCash);
     document.getElementById('saldoBBVA').textContent = fmt(totalBank);
     document.getElementById('totalSaldo').textContent = fmt(accounts.reduce((s, a) => s + parseFloat(a.current_balance || 0), 0));
-    document.getElementById('miniCuentas').innerHTML = accounts.map(a => `
-      <div class="flex-1 bg-slate-900 p-2 rounded-xl text-center min-w-0">
-        <span class="text-xs text-slate-400 truncate block">${a.name}</span>
+    document.getElementById('miniCuentas').innerHTML = accounts.map(a => {
+      if (a.type === 'CREDIT_CARD' && a.credit_limit) {
+        const usado = parseFloat(a.credit_limit) - parseFloat(a.current_balance);
+        const pct = Math.min(100, Math.round(usado / parseFloat(a.credit_limit) * 100));
+        const barColor = pct > 80 ? 'bg-red-500' : pct > 50 ? 'bg-amber-400' : 'bg-green-400';
+        return `<div class="w-full bg-slate-900 p-2 rounded-xl min-w-0">
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-400">💳 ${a.name}</span>
+            <span class="text-slate-300">${fmt(a.current_balance)} disp.</span>
+          </div>
+          <div class="w-full bg-slate-700 rounded-full h-1.5">
+            <div class="${barColor} h-1.5 rounded-full" style="width:${pct}%"></div>
+          </div>
+          <div class="flex justify-between text-xs mt-1 text-slate-500">
+            <span>Usado: ${fmt(usado)}</span>
+            <span>Límite: ${fmt(a.credit_limit)}</span>
+          </div>
+          ${a.cut_date || a.payment_date ? `<div class="text-xs text-slate-500 mt-0.5">${a.cut_date ? `✂️ corte día ${a.cut_date}` : ''} ${a.payment_date ? `· 💰 pago día ${a.payment_date}` : ''}</div>` : ''}
+        </div>`;
+      }
+      return `<div class="flex-1 bg-slate-900 p-2 rounded-xl text-center min-w-0">
+        <span class="text-xs text-slate-400 truncate block">${acctIcon(a.type)} ${a.name}</span>
         <span class="block font-semibold text-sm">${fmt(a.current_balance)}</span>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   function renderTransacciones() {
@@ -441,11 +475,26 @@
   function acctIcon(type) { return type === 'CASH' ? '💵' : type === 'CREDIT_CARD' ? '💳' : '🏦'; }
 
   function renderCuentas() {
-    document.getElementById('listaCuentas').innerHTML = window.NixState.accounts.map(a => `
-      <div class="flex justify-between items-center bg-slate-900 p-3 rounded-xl">
-        <span>${acctIcon(a.type)} ${a.name}</span>
+    document.getElementById('listaCuentas').innerHTML = window.NixState.accounts.map(a => {
+      if (a.type === 'CREDIT_CARD' && a.credit_limit) {
+        const usado = parseFloat(a.credit_limit) - parseFloat(a.current_balance);
+        return `<div class="bg-slate-900 p-3 rounded-xl space-y-1">
+          <div class="flex justify-between text-sm">
+            <span>💳 ${a.name}</span>
+            <span class="font-mono text-green-300">${fmt(a.current_balance)} disp.</span>
+          </div>
+          <div class="flex justify-between text-xs text-slate-500">
+            <span>Usado: <span class="text-red-400">${fmt(usado)}</span></span>
+            <span>Límite: ${fmt(a.credit_limit)}</span>
+          </div>
+          ${a.cut_date || a.payment_date ? `<div class="text-xs text-slate-500">${a.cut_date ? `✂️ corte día ${a.cut_date}` : ''} ${a.payment_date ? `· 💰 pago día ${a.payment_date}` : ''}</div>` : ''}
+        </div>`;
+      }
+      return `<div class="flex justify-between items-center bg-slate-900 p-3 rounded-xl">
+        <span class="text-sm">${acctIcon(a.type)} ${a.name}</span>
         <span class="font-mono text-sm">${fmt(a.current_balance)} <span class="text-slate-500 text-xs">${a.currency || ''}</span></span>
-      </div>`).join('') || '<p class="text-slate-500 italic text-center py-4">Sin cuentas</p>';
+      </div>`;
+    }).join('') || '<p class="text-slate-500 italic text-center py-4">Sin cuentas</p>';
   }
 
   function renderCuentasEditar() {
@@ -619,11 +668,19 @@
     document.getElementById('cuentaNombre').value = '';
     document.getElementById('cuentaTipo').value = 'CASH';
     document.getElementById('cuentaSaldo').value = '';
+    document.getElementById('cuentaLimite').value = '';
+    document.getElementById('cuentaCorte').value = '';
+    document.getElementById('cuentaPago').value = '';
+    document.getElementById('camposTarjeta').classList.add('hidden');
     document.getElementById('errorCuenta').classList.add('hidden');
   }
 
   document.getElementById('cerrarModalCuenta').addEventListener('click', cerrarModalCuenta);
   window.addEventListener('click', e => { if (e.target === modalCuenta) cerrarModalCuenta(); });
+
+  document.getElementById('cuentaTipo').addEventListener('change', e => {
+    document.getElementById('camposTarjeta').classList.toggle('hidden', e.target.value !== 'CREDIT_CARD');
+  });
 
   document.getElementById('btnNuevaCuenta').addEventListener('click', () => {
     editandoCuentaId = null;
@@ -641,6 +698,11 @@
     document.getElementById('cuentaNombre').value = a.name;
     document.getElementById('cuentaTipo').value = a.type;
     document.getElementById('cuentaSaldo').value = a.current_balance ?? '';
+    const esTC = a.type === 'CREDIT_CARD';
+    document.getElementById('camposTarjeta').classList.toggle('hidden', !esTC);
+    document.getElementById('cuentaLimite').value = a.credit_limit ?? '';
+    document.getElementById('cuentaCorte').value = a.cut_date ?? '';
+    document.getElementById('cuentaPago').value = a.payment_date ?? '';
     document.getElementById('errorCuenta').classList.add('hidden');
     modalCuenta.style.display = 'flex';
     lucide.createIcons();
@@ -654,6 +716,12 @@
     const type = document.getElementById('cuentaTipo').value;
     const saldoRaw = document.getElementById('cuentaSaldo').value;
     const current_balance = saldoRaw !== '' ? parseFloat(saldoRaw) : undefined;
+    const limiteRaw = document.getElementById('cuentaLimite').value;
+    const corteRaw = document.getElementById('cuentaCorte').value;
+    const pagoRaw = document.getElementById('cuentaPago').value;
+    const credit_limit = limiteRaw !== '' ? parseFloat(limiteRaw) : null;
+    const cut_date = corteRaw !== '' ? parseInt(corteRaw) : null;
+    const payment_date = pagoRaw !== '' ? parseInt(pagoRaw) : null;
 
     if (!name) { errEl.textContent = 'El nombre es requerido'; errEl.classList.remove('hidden'); return; }
     errEl.classList.add('hidden');
@@ -661,7 +729,7 @@
 
     try {
       if (editandoCuentaId) {
-        const body = { name, type };
+        const body = { name, type, credit_limit, cut_date, payment_date };
         if (current_balance !== undefined) body.current_balance = current_balance;
         const res = await apiFetch(`/api/accounts/${editandoCuentaId}`, {
           method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -673,7 +741,7 @@
       } else {
         const res = await apiFetch('/api/accounts', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, type, initial_balance: current_balance ?? 0 }),
+          body: JSON.stringify({ name, type, initial_balance: current_balance ?? 0, credit_limit, cut_date, payment_date }),
         });
         window.NixState.accounts.push(res.account);
         showToast('✅ Cuenta creada');
