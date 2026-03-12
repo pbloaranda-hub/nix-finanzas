@@ -311,26 +311,27 @@
           <span class="text-sm font-medium text-slate-300">Cuenta ${i + 1}</span>
           ${i > 0 ? `<button onclick="removeOnboardingCuenta(${i})" class="text-slate-500 hover:text-red-400"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
         </div>
-        <input type="text" placeholder="Nombre (ej: BBVA, Efectivo)" class="input-slate"
-          value="${c.name}" oninput="onboardingCuentas[${i}].name = this.value">
-        <select class="input-slate" onchange="onboardingCuentas[${i}].type = this.value">
+        <input id="ob-name-${i}" type="text" placeholder="Nombre (ej: BBVA, Efectivo)" class="input-slate"
+          value="${c.name}">
+        <select id="ob-type-${i}" class="input-slate">
           <option value="CASH"        ${c.type==='CASH'?'selected':''}>💵 Efectivo / Caja</option>
           <option value="BANK"        ${c.type==='BANK'?'selected':''}>🏦 Cuenta banco</option>
           <option value="CREDIT_CARD" ${c.type==='CREDIT_CARD'?'selected':''}>💳 Tarjeta de crédito</option>
         </select>
-        <input type="number" placeholder="Saldo actual" class="input-slate" step="0.01"
-          value="${c.initial_balance || ''}" oninput="onboardingCuentas[${i}].initial_balance = parseFloat(this.value) || 0">
+        <input id="ob-bal-${i}" type="number" placeholder="Saldo actual" class="input-slate" step="0.01"
+          value="${c.initial_balance || ''}">
       </div>`).join('');
     lucide.createIcons();
   }
 
   function saveOnboardingFromDOM() {
-    document.querySelectorAll('#onboarding-cuentas .card').forEach((card, i) => {
-      const inputs  = card.querySelectorAll('input');
-      const select  = card.querySelector('select');
-      if (inputs[0]) onboardingCuentas[i].name            = inputs[0].value;
-      if (select)    onboardingCuentas[i].type            = select.value;
-      if (inputs[1]) onboardingCuentas[i].initial_balance = parseFloat(inputs[1].value) || 0;
+    onboardingCuentas.forEach((_, i) => {
+      const name = document.getElementById(`ob-name-${i}`);
+      const type = document.getElementById(`ob-type-${i}`);
+      const bal  = document.getElementById(`ob-bal-${i}`);
+      if (name) onboardingCuentas[i].name            = name.value;
+      if (type) onboardingCuentas[i].type            = type.value;
+      if (bal)  onboardingCuentas[i].initial_balance = parseFloat(bal.value) || 0;
     });
   }
 
