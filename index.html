@@ -18,7 +18,7 @@
     .tab-bar { background:#1e293b; border-radius:3rem 3rem 0 0; position:fixed; bottom:0; left:0; right:0; max-width:420px; margin:0 auto; padding:.5rem 1rem; display:flex; justify-content:space-around; border-top:1px solid #334155; box-shadow:0 -4px 20px rgba(0,0,0,.7); z-index:50; }
     .tab-item { display:flex; flex-direction:column; align-items:center; color:#94a3b8; font-size:.7rem; padding:.4rem .8rem; border-radius:2rem; transition:.1s; }
     .tab-item.active { background:#2d3b4f; color:#60a5fa; }
-    .modal-overlay { background:rgba(0,0,0,.8); backdrop-filter:blur(3px); display:none; position:fixed; inset:0; z-index:100; align-items:center; justify-content:center; padding:1rem; }
+    .modal-overlay { background:rgba(0,0,0,.8); backdrop-filter:blur(3px); display:none; position:fixed; inset:0; z-index:300; align-items:center; justify-content:center; padding:1rem; }
     .modal-container { background:#1e293b; border-radius:2rem; max-width:400px; width:100%; max-height:90vh; overflow-y:auto; padding:1.5rem; }
     .badge-pending    { background:#854d0e; color:#fde047; font-size:.7rem; border-radius:1rem; padding:.2rem .6rem; }
     .badge-reconciled { background:#166534; color:#bbf7d0; font-size:.7rem; border-radius:1rem; padding:.2rem .6rem; }
@@ -66,6 +66,7 @@
   <div class="card w-full max-w-sm">
     <p class="text-center text-slate-300 mb-4">Entra con tu cuenta de Google</p>
     <div id="google-btn" class="flex justify-center"></div>
+    <button id="btnOtraCuenta" class="w-full text-xs text-slate-500 mt-2 hover:text-slate-300 underline">Usar otra cuenta de Google</button>
     <p id="login-error" class="text-red-400 text-xs text-center mt-3 hidden"></p>
     <hr class="border-slate-700 my-4">
     <p class="text-center text-xs text-slate-500 mb-2">¿Te invitaron a un hogar compartido?</p>
@@ -113,13 +114,17 @@
       </div>
     </div>
 
-    <!-- Tabs superiores -->
-    <div class="flex gap-1 bg-slate-800 p-1 rounded-full mb-5 text-sm font-medium">
-      <button class="tab-superior flex-1 py-2 px-1 rounded-full text-center" data-superior="dashboard">📊 Dash</button>
-      <button class="tab-superior flex-1 py-2 px-1 rounded-full text-center" data-superior="transacciones">📋 Movs</button>
-      <button class="tab-superior flex-1 py-2 px-1 rounded-full text-center" data-superior="importar">📎 Importar</button>
-      <button class="tab-superior flex-1 py-2 px-1 rounded-full text-center" data-superior="cuentas">🏦 Cuentas</button>
+    <!-- Sub-tabs contextuales (se muestran según panel activo) -->
+    <div id="subtabs-importar" class="hidden flex gap-1 bg-slate-800 p-1 rounded-full mb-5 text-sm font-medium">
+      <button class="subtab-imp flex-1 py-2 rounded-full text-center" data-imp="pdf">📄 PDF BBVA</button>
+      <button class="subtab-imp flex-1 py-2 rounded-full text-center" data-imp="csv">📎 CSV Manual</button>
     </div>
+    <div id="subtabs-cuentas" class="hidden flex gap-1 bg-slate-800 p-1 rounded-full mb-5 text-sm font-medium">
+      <button class="subtab-cta flex-1 py-2 rounded-full text-center" data-cta="lista">🏦 Cuentas</button>
+      <button class="subtab-cta flex-1 py-2 rounded-full text-center" data-cta="editar">✏️ Editar</button>
+      <button class="subtab-cta flex-1 py-2 rounded-full text-center" data-cta="hogar">👥 Hogar</button>
+    </div>
+    <div id="subtabs-placeholder" class="mb-5"></div>
 
     <!-- Panel Dashboard -->
     <div id="panel-dashboard" class="panel space-y-4">
@@ -147,8 +152,7 @@
 
     <!-- Panel Importar -->
     <div id="panel-importar" class="panel hidden space-y-4">
-      <!-- PDF Estado de cuenta -->
-      <div class="card">
+      <div id="subpanel-imp-pdf" class="card space-y-2">
         <label class="text-sm font-medium">📄 Estado de cuenta BBVA (PDF)</label>
         <select id="importarCuentaPDF" class="input-slate mt-2"></select>
         <label class="btn-outline w-full flex items-center justify-center gap-2 mt-2 cursor-pointer">
@@ -160,8 +164,7 @@
         </button>
         <div id="pdfResult" class="text-xs text-green-400 mt-2"></div>
       </div>
-      <!-- CSV manual -->
-      <div class="card">
+      <div id="subpanel-imp-csv" class="hidden card space-y-2">
         <label class="text-sm font-medium">📎 CSV manual (fecha, monto, descripción)</label>
         <select id="importarCuenta" class="input-slate mt-2"></select>
         <textarea id="bbvaCsvInput" rows="4" class="input-slate mt-2 text-sm"
@@ -175,17 +178,25 @@
 
     <!-- Panel Cuentas -->
     <div id="panel-cuentas" class="panel hidden space-y-3">
-      <div class="card">
-        <h2 class="font-medium mb-3">Mis cuentas</h2>
+      <!-- Sub-panel: Ver -->
+      <div id="subpanel-cta-lista">
         <div id="listaCuentas" class="space-y-2 text-sm"></div>
       </div>
-      <div class="card">
-        <h2 class="font-medium mb-2">Hogar compartido</h2>
-        <div id="listaMembers" class="text-sm text-slate-400 mb-3"></div>
+      <!-- Sub-panel: Editar -->
+      <div id="subpanel-cta-editar" class="hidden space-y-3">
+        <button id="btnNuevaCuenta" class="btn-primary w-full flex items-center justify-center gap-2">
+          <i data-lucide="plus" class="w-4 h-4"></i> Agregar cuenta
+        </button>
+        <div id="listaCuentasEditar" class="space-y-2 text-sm"></div>
+      </div>
+      <!-- Sub-panel: Hogar -->
+      <div id="subpanel-cta-hogar" class="hidden card space-y-3">
+        <h2 class="font-medium">Hogar compartido</h2>
+        <div id="listaMembers" class="text-sm text-slate-400"></div>
         <button id="btnInvitar" class="btn-outline w-full flex items-center justify-center gap-2">
           <i data-lucide="user-plus" class="w-4 h-4"></i> Invitar a mi esposa / pareja
         </button>
-        <div id="inviteResult" class="mt-3 hidden">
+        <div id="inviteResult" class="hidden">
           <p class="text-xs text-slate-400 mb-1">Comparte este código de invitación:</p>
           <div class="flex gap-2 items-center">
             <span id="inviteCode" class="font-mono text-xl text-blue-400 tracking-widest bg-slate-900 px-4 py-2 rounded-xl flex-1 text-center"></span>
@@ -234,6 +245,29 @@
         <i data-lucide="check" class="w-4 h-4"></i> <span id="guardarBtnText">Guardar</span>
       </button>
       <p id="errorGasto" class="text-xs text-red-400 hidden"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL CUENTA ══ -->
+<div id="modalCuenta" class="modal-overlay">
+  <div class="modal-container">
+    <h2 class="text-xl font-bold flex justify-between items-center">
+      <span id="modalCuentaTitulo">Nueva cuenta</span>
+      <button id="cerrarModalCuenta" class="text-slate-400"><i data-lucide="x" class="w-6"></i></button>
+    </h2>
+    <div class="space-y-3 mt-3">
+      <input type="text" id="cuentaNombre" placeholder="Nombre (ej: BBVA Débito, Efectivo)" class="input-slate">
+      <select id="cuentaTipo" class="input-slate">
+        <option value="CASH">💵 Efectivo / Caja</option>
+        <option value="BANK">🏦 Cuenta banco</option>
+        <option value="CREDIT_CARD">💳 Tarjeta de crédito</option>
+      </select>
+      <input type="number" id="cuentaSaldo" placeholder="Saldo actual" class="input-slate" step="0.01">
+      <button id="guardarCuentaBtn" class="btn-primary w-full flex items-center justify-center gap-2">
+        <i data-lucide="check" class="w-4 h-4"></i> <span id="guardarCuentaBtnText">Guardar</span>
+      </button>
+      <p id="errorCuenta" class="text-xs text-red-400 hidden"></p>
     </div>
   </div>
 </div>
@@ -294,11 +328,16 @@
 
   function initGoogleLogin() {
     if (!window.google) { setTimeout(initGoogleLogin, 300); return; }
-    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
+    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential, auto_select: false });
     google.accounts.id.renderButton(document.getElementById('google-btn'), {
       theme: 'filled_black', size: 'large', shape: 'pill', text: 'signin_with',
     });
   }
+
+  document.getElementById('btnOtraCuenta').addEventListener('click', () => {
+    google.accounts.id.disableAutoSelect();
+    google.accounts.id.prompt();
+  });
 
   // ── Onboarding ────────────────────────────────────────
   let onboardingCuentas = [{ name: '', type: 'CASH', initial_balance: 0 }];
@@ -380,7 +419,7 @@
     window.NixState.categories   = catRes?.categories   || [];
     window.NixState.transactions = txRes?.transactions  || [];
     document.getElementById('statusConexion').textContent = 'D1 conectado ✓';
-    populateSelects(); refreshSaldos(); renderTransacciones(); renderCuentas();
+    populateSelects(); refreshSaldos(); renderTransacciones(); renderCuentas(); renderCuentasEditar();
     // Cargar miembros del hogar
     apiFetch('/api/me').then(r => { if (r?.household?.members) renderMembers(r.household.members); }).catch(()=>{});
   }
@@ -429,12 +468,25 @@
     }).join('');
   }
 
+  function acctIcon(type) { return type === 'CASH' ? '💵' : type === 'CREDIT_CARD' ? '💳' : '🏦'; }
+
   function renderCuentas() {
     document.getElementById('listaCuentas').innerHTML = window.NixState.accounts.map(a => `
-      <div class="flex justify-between items-center bg-slate-900 p-2 rounded-xl">
-        <span>${a.type === 'CASH' ? '💵' : a.type === 'CREDIT_CARD' ? '💳' : '🏦'} ${a.name}</span>
-        <span class="font-mono">${fmt(a.current_balance)} ${a.currency || ''}</span>
-      </div>`).join('');
+      <div class="flex justify-between items-center bg-slate-900 p-3 rounded-xl">
+        <span>${acctIcon(a.type)} ${a.name}</span>
+        <span class="font-mono text-sm">${fmt(a.current_balance)} <span class="text-slate-500 text-xs">${a.currency || ''}</span></span>
+      </div>`).join('') || '<p class="text-slate-500 italic text-center py-4">Sin cuentas</p>';
+  }
+
+  function renderCuentasEditar() {
+    document.getElementById('listaCuentasEditar').innerHTML = window.NixState.accounts.map(a => `
+      <div class="flex justify-between items-center bg-slate-900 p-3 rounded-xl gap-3">
+        <span class="flex-1">${acctIcon(a.type)} ${a.name}</span>
+        <span class="font-mono text-xs text-slate-400">${fmt(a.current_balance)}</span>
+        <button onclick="abrirEditarCuenta('${a.id}')" class="bg-blue-600 hover:bg-blue-500 text-white text-sm px-4 py-2 rounded-xl font-medium flex-shrink-0">
+          Editar
+        </button>
+      </div>`).join('') || '<p class="text-slate-500 italic text-center py-4">Sin cuentas</p>';
   }
 
   // ── Navegación ────────────────────────────────────────
@@ -445,17 +497,49 @@
     cuentas: document.getElementById('panel-cuentas'),
   };
 
+  function showSubtabs(panelId) {
+    document.getElementById('subtabs-importar').classList.add('hidden');
+    document.getElementById('subtabs-cuentas').classList.add('hidden');
+    document.getElementById('subtabs-placeholder').classList.remove('hidden');
+    if (panelId === 'importar') {
+      document.getElementById('subtabs-importar').classList.remove('hidden');
+      document.getElementById('subtabs-placeholder').classList.add('hidden');
+    } else if (panelId === 'cuentas') {
+      document.getElementById('subtabs-cuentas').classList.remove('hidden');
+      document.getElementById('subtabs-placeholder').classList.add('hidden');
+    }
+  }
+
   function showPanel(id) {
     Object.values(panels).forEach(p => p.classList.add('hidden'));
     panels[id].classList.remove('hidden');
     document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.bottom === id));
-    document.querySelectorAll('.tab-superior').forEach(t => {
-      t.classList.toggle('bg-blue-600', t.dataset.superior === id);
-      t.classList.toggle('text-white', t.dataset.superior === id);
-    });
+    showSubtabs(id);
   }
   document.querySelectorAll('.tab-item').forEach(t => t.addEventListener('click', () => showPanel(t.dataset.bottom)));
-  document.querySelectorAll('.tab-superior').forEach(t => t.addEventListener('click', () => showPanel(t.dataset.superior)));
+
+  // Sub-tabs Importar
+  function showImpSub(sub) {
+    document.getElementById('subpanel-imp-pdf').classList.toggle('hidden', sub !== 'pdf');
+    document.getElementById('subpanel-imp-csv').classList.toggle('hidden', sub !== 'csv');
+    document.querySelectorAll('.subtab-imp').forEach(t => {
+      t.classList.toggle('bg-blue-600', t.dataset.imp === sub);
+      t.classList.toggle('text-white', t.dataset.imp === sub);
+    });
+  }
+  document.querySelectorAll('.subtab-imp').forEach(t => t.addEventListener('click', () => showImpSub(t.dataset.imp)));
+  showImpSub('pdf');
+
+  // Sub-tabs Cuentas
+  function showCtaSub(sub) {
+    ['lista','editar','hogar'].forEach(s => document.getElementById(`subpanel-cta-${s}`).classList.toggle('hidden', s !== sub));
+    document.querySelectorAll('.subtab-cta').forEach(t => {
+      t.classList.toggle('bg-blue-600', t.dataset.cta === sub);
+      t.classList.toggle('text-white', t.dataset.cta === sub);
+    });
+  }
+  document.querySelectorAll('.subtab-cta').forEach(t => t.addEventListener('click', () => showCtaSub(t.dataset.cta)));
+  showCtaSub('lista');
 
   // ── Logout ────────────────────────────────────────────
   function doLogout() { clearSession(); showScreen('login'); initGoogleLogin(); }
@@ -671,6 +755,82 @@
       document.getElementById('login-error').textContent = err.message;
       document.getElementById('login-error').classList.remove('hidden');
     }
+  });
+
+  // ── Modal Cuenta (agregar / editar) ──────────────────
+  const modalCuenta = document.getElementById('modalCuenta');
+  let editandoCuentaId = null;
+
+  function cerrarModalCuenta() {
+    modalCuenta.style.display = 'none';
+    editandoCuentaId = null;
+    document.getElementById('cuentaNombre').value = '';
+    document.getElementById('cuentaTipo').value = 'CASH';
+    document.getElementById('cuentaSaldo').value = '';
+    document.getElementById('errorCuenta').classList.add('hidden');
+  }
+
+  document.getElementById('cerrarModalCuenta').addEventListener('click', cerrarModalCuenta);
+  window.addEventListener('click', e => { if (e.target === modalCuenta) cerrarModalCuenta(); });
+
+  document.getElementById('btnNuevaCuenta').addEventListener('click', () => {
+    editandoCuentaId = null;
+    document.getElementById('modalCuentaTitulo').textContent = 'Nueva cuenta';
+    cerrarModalCuenta();
+    modalCuenta.style.display = 'flex';
+    lucide.createIcons();
+  });
+
+  window.abrirEditarCuenta = function(id) {
+    const a = window.NixState.accounts.find(x => x.id === id);
+    if (!a) return;
+    editandoCuentaId = id;
+    document.getElementById('modalCuentaTitulo').textContent = 'Editar cuenta';
+    document.getElementById('cuentaNombre').value = a.name;
+    document.getElementById('cuentaTipo').value = a.type;
+    document.getElementById('cuentaSaldo').value = a.current_balance ?? '';
+    document.getElementById('errorCuenta').classList.add('hidden');
+    modalCuenta.style.display = 'flex';
+    lucide.createIcons();
+  };
+
+  document.getElementById('guardarCuentaBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('guardarCuentaBtn');
+    const btnText = document.getElementById('guardarCuentaBtnText');
+    const errEl = document.getElementById('errorCuenta');
+    const name = document.getElementById('cuentaNombre').value.trim();
+    const type = document.getElementById('cuentaTipo').value;
+    const saldoRaw = document.getElementById('cuentaSaldo').value;
+    const current_balance = saldoRaw !== '' ? parseFloat(saldoRaw) : undefined;
+
+    if (!name) { errEl.textContent = 'El nombre es requerido'; errEl.classList.remove('hidden'); return; }
+    errEl.classList.add('hidden');
+    btn.disabled = true; btnText.textContent = 'Guardando…';
+
+    try {
+      if (editandoCuentaId) {
+        const body = { name, type };
+        if (current_balance !== undefined) body.current_balance = current_balance;
+        const res = await apiFetch(`/api/accounts/${editandoCuentaId}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const idx = window.NixState.accounts.findIndex(a => a.id === editandoCuentaId);
+        if (idx !== -1) window.NixState.accounts[idx] = { ...window.NixState.accounts[idx], ...res.account };
+        showToast('✅ Cuenta actualizada');
+      } else {
+        const res = await apiFetch('/api/accounts', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, type, initial_balance: current_balance ?? 0 }),
+        });
+        window.NixState.accounts.push(res.account);
+        showToast('✅ Cuenta creada');
+      }
+      populateSelects(); refreshSaldos(); renderCuentas(); renderCuentasEditar();
+      cerrarModalCuenta();
+    } catch (err) {
+      errEl.textContent = err.message; errEl.classList.remove('hidden');
+    } finally { btn.disabled = false; btnText.textContent = 'Guardar'; }
   });
 
   // ── Arrancar ──────────────────────────────────────────
