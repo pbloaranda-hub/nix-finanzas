@@ -115,10 +115,6 @@
     </div>
 
     <!-- Sub-tabs contextuales (se muestran según panel activo) -->
-    <div id="subtabs-importar" class="hidden flex gap-1 bg-slate-800 p-1 rounded-full mb-5 text-sm font-medium">
-      <button class="subtab-imp flex-1 py-2 rounded-full text-center" data-imp="pdf">📄 PDF BBVA</button>
-      <button class="subtab-imp flex-1 py-2 rounded-full text-center" data-imp="csv">📎 CSV Manual</button>
-    </div>
     <div id="subtabs-cuentas" class="hidden flex gap-1 bg-slate-800 p-1 rounded-full mb-5 text-sm font-medium">
       <button class="subtab-cta flex-1 py-2 rounded-full text-center" data-cta="lista">🏦 Cuentas</button>
       <button class="subtab-cta flex-1 py-2 rounded-full text-center" data-cta="editar">✏️ Editar</button>
@@ -150,31 +146,7 @@
       </div>
     </div>
 
-    <!-- Panel Importar -->
-    <div id="panel-importar" class="panel hidden space-y-4">
-      <div id="subpanel-imp-pdf" class="card space-y-2">
-        <label class="text-sm font-medium">📄 Estado de cuenta BBVA (PDF)</label>
-        <select id="importarCuentaPDF" class="input-slate mt-2"></select>
-        <label class="btn-outline w-full flex items-center justify-center gap-2 mt-2 cursor-pointer">
-          <i data-lucide="upload" class="w-4 h-4"></i> <span id="pdfLabel">Seleccionar PDF</span>
-          <input type="file" id="pdfInput" accept="application/pdf" class="hidden">
-        </label>
-        <button id="ejecutarPDF" class="btn-primary w-full mt-2 flex items-center justify-center gap-2" disabled>
-          <i data-lucide="rotate-cw" class="w-4 h-4"></i> Importar PDF
-        </button>
-        <div id="pdfResult" class="text-xs text-green-400 mt-2"></div>
-      </div>
-      <div id="subpanel-imp-csv" class="hidden card space-y-2">
-        <label class="text-sm font-medium">📎 CSV manual (fecha, monto, descripción)</label>
-        <select id="importarCuenta" class="input-slate mt-2"></select>
-        <textarea id="bbvaCsvInput" rows="4" class="input-slate mt-2 text-sm"
-          placeholder="15/03/2025, -1250, SUPERMERCADO&#10;14/03/2025, 3400, SUELDO"></textarea>
-        <button id="ejecutarParser" class="btn-primary w-full mt-2 flex items-center justify-center gap-2">
-          <i data-lucide="rotate-cw" class="w-4 h-4"></i> Importar CSV
-        </button>
-        <div id="parserResult" class="text-xs text-green-400 mt-2"></div>
-      </div>
-    </div>
+
 
     <!-- Panel Cuentas -->
     <div id="panel-cuentas" class="panel hidden space-y-3">
@@ -212,7 +184,6 @@
   <nav class="tab-bar">
     <button class="tab-item active" data-bottom="dashboard"><i data-lucide="layout-dashboard" class="w-5 h-5"></i><span>Dash</span></button>
     <button class="tab-item" data-bottom="transacciones"><i data-lucide="list" class="w-5 h-5"></i><span>Movs</span></button>
-    <button class="tab-item" data-bottom="importar"><i data-lucide="import" class="w-5 h-5"></i><span>Importar</span></button>
     <button class="tab-item" data-bottom="cuentas"><i data-lucide="wallet" class="w-5 h-5"></i><span>Cuentas</span></button>
   </nav>
 
@@ -426,7 +397,7 @@
 
   function populateSelects() {
     const accounts = window.NixState.accounts;
-    ['cuentaGasto', 'importarCuenta', 'importarCuentaPDF'].forEach(id => {
+    ['cuentaGasto'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
     });
@@ -454,16 +425,15 @@
     const txs = window.NixState.transactions;
     if (!txs.length) { container.innerHTML = '<p class="text-slate-500 text-sm text-center py-4">Sin transacciones</p>'; return; }
     container.innerHTML = txs.map(tx => {
-      const badgeCls = tx.status === 'RECONCILED' ? 'badge-reconciled' : tx.status === 'CLEARED' ? 'badge-cleared' : 'badge-pending';
       const amtColor = parseFloat(tx.amount) < 0 ? 'text-red-300' : 'text-green-300';
-      return `<div class="bg-slate-900 p-3 rounded-xl text-sm flex justify-between items-center">
-        <div>
+      return `<div class="bg-slate-900 p-3 rounded-xl text-sm flex justify-between items-start gap-2">
+        <div class="flex-1 min-w-0">
           <span class="font-mono ${amtColor}">${fmt(tx.amount)}</span>
           <span class="text-slate-400 ml-1">${tx.account_name || ''}</span>
           <div class="text-xs text-slate-500">${tx.category_icon || ''} ${tx.category_name || '—'} · ${(tx.transaction_date || '').slice(0,10)}</div>
-          ${tx.description ? `<div class="text-xs text-slate-400 italic">${tx.description}</div>` : ''}
+          ${tx.description ? `<div class="text-xs text-slate-400 italic truncate">${tx.description}</div>` : ''}
         </div>
-        <span class="${badgeCls}">${tx.status}</span>
+        <button onclick="borrarTransaccion('${tx.id}')" class="text-slate-600 hover:text-red-400 flex-shrink-0 p-1">🗑</button>
       </div>`;
     }).join('');
   }
@@ -493,18 +463,13 @@
   const panels = {
     dashboard: document.getElementById('panel-dashboard'),
     transacciones: document.getElementById('panel-transacciones'),
-    importar: document.getElementById('panel-importar'),
     cuentas: document.getElementById('panel-cuentas'),
   };
 
   function showSubtabs(panelId) {
-    document.getElementById('subtabs-importar').classList.add('hidden');
     document.getElementById('subtabs-cuentas').classList.add('hidden');
     document.getElementById('subtabs-placeholder').classList.remove('hidden');
-    if (panelId === 'importar') {
-      document.getElementById('subtabs-importar').classList.remove('hidden');
-      document.getElementById('subtabs-placeholder').classList.add('hidden');
-    } else if (panelId === 'cuentas') {
+    if (panelId === 'cuentas') {
       document.getElementById('subtabs-cuentas').classList.remove('hidden');
       document.getElementById('subtabs-placeholder').classList.add('hidden');
     }
@@ -517,18 +482,6 @@
     showSubtabs(id);
   }
   document.querySelectorAll('.tab-item').forEach(t => t.addEventListener('click', () => showPanel(t.dataset.bottom)));
-
-  // Sub-tabs Importar
-  function showImpSub(sub) {
-    document.getElementById('subpanel-imp-pdf').classList.toggle('hidden', sub !== 'pdf');
-    document.getElementById('subpanel-imp-csv').classList.toggle('hidden', sub !== 'csv');
-    document.querySelectorAll('.subtab-imp').forEach(t => {
-      t.classList.toggle('bg-blue-600', t.dataset.imp === sub);
-      t.classList.toggle('text-white', t.dataset.imp === sub);
-    });
-  }
-  document.querySelectorAll('.subtab-imp').forEach(t => t.addEventListener('click', () => showImpSub(t.dataset.imp)));
-  showImpSub('pdf');
 
   // Sub-tabs Cuentas
   function showCtaSub(sub) {
@@ -611,107 +564,6 @@
     } finally { btn.disabled = false; btnText.textContent = 'Guardar'; }
   });
 
-  // ── Importar BBVA ─────────────────────────────────────
-  document.getElementById('ejecutarParser').addEventListener('click', async () => {
-    const csvText    = document.getElementById('bbvaCsvInput').value.trim();
-    const account_id = document.getElementById('importarCuenta').value;
-    const resultEl   = document.getElementById('parserResult');
-    const btn        = document.getElementById('ejecutarParser');
-    if (!csvText) { resultEl.textContent = '⚠️ Pega el texto del extracto'; return; }
-    btn.disabled = true; resultEl.textContent = 'Importando…';
-    try {
-      const res = await apiFetch('/api/import/bbva', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csvText, account_id }),
-      });
-      resultEl.textContent = `✅ ${res.imported} transacciones importadas`;
-      const txRes = await apiFetch('/api/transactions?limit=50');
-      window.NixState.transactions = txRes?.transactions || [];
-      renderTransacciones();
-    } catch (err) {
-      resultEl.textContent = '❌ ' + err.message;
-    } finally { btn.disabled = false; }
-  });
-
-  // ── Importar PDF BBVA ─────────────────────────────────
-  let pdfTextCached = null;
-
-  document.getElementById('pdfInput').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    document.getElementById('pdfLabel').textContent = file.name;
-    // Leer el PDF como ArrayBuffer y enviar al worker para extraer texto
-    // El worker no puede usar pdftotext, así que enviamos el texto extraído localmente
-    // En el navegador usamos pdf.js para extraer el texto
-    pdfTextCached = null;
-    document.getElementById('pdfResult').textContent = 'Leyendo PDF…';
-    try {
-      // Cargar pdf.js dinámicamente si no está disponible
-      if (!window.pdfjsLib) {
-        await new Promise((res, rej) => {
-          const s = document.createElement('script');
-          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-          s.onload = res; s.onerror = rej;
-          document.head.appendChild(s);
-        });
-        pdfjsLib.GlobalWorkerOptions.workerSrc =
-          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      }
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      let fullText = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        // Reconstruir líneas con posición X para mantener columnas
-        const items = content.items.sort((a, b) => {
-          const diffY = Math.round(b.transform[5]) - Math.round(a.transform[5]);
-          return diffY !== 0 ? diffY : a.transform[4] - b.transform[4];
-        });
-        let lastY = null, line = '';
-        for (const item of items) {
-          const y = Math.round(item.transform[5]);
-          const x = Math.round(item.transform[4]);
-          if (lastY !== null && Math.abs(y - lastY) > 3) {
-            fullText += line + '\n';
-            line = ' '.repeat(Math.max(0, Math.floor(x / 5)));
-          } else if (line.length > 0) {
-            line += ' ';
-          }
-          line += item.str;
-          lastY = y;
-        }
-        if (line) fullText += line + '\n';
-      }
-      pdfTextCached = fullText;
-      document.getElementById('ejecutarPDF').disabled = false;
-      document.getElementById('pdfResult').textContent = '✅ PDF leído, listo para importar';
-    } catch (err) {
-      document.getElementById('pdfResult').textContent = '❌ Error leyendo PDF: ' + err.message;
-    }
-  });
-
-  document.getElementById('ejecutarPDF').addEventListener('click', async () => {
-    const account_id = document.getElementById('importarCuentaPDF').value;
-    const resultEl   = document.getElementById('pdfResult');
-    const btn        = document.getElementById('ejecutarPDF');
-    if (!pdfTextCached) { resultEl.textContent = '⚠️ Selecciona un PDF primero'; return; }
-    btn.disabled = true; resultEl.textContent = 'Importando…';
-    try {
-      const res = await apiFetch('/api/import/bbva-pdf', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pdfText: pdfTextCached, account_id }),
-      });
-      resultEl.textContent = `✅ ${res.imported} movimientos importados`;
-      resultEl.className = 'text-xs text-green-400 mt-2';
-      const txRes = await apiFetch('/api/transactions?limit=50');
-      window.NixState.transactions = txRes?.transactions || [];
-      renderTransacciones();
-    } catch (err) {
-      resultEl.textContent = '❌ ' + err.message;
-      resultEl.className = 'text-xs text-red-400 mt-2';
-    } finally { btn.disabled = false; }
-  });
 
   // ── Invitar al hogar ──────────────────────────────────
   document.getElementById('btnInvitar').addEventListener('click', async () => {
@@ -832,6 +684,22 @@
       errEl.textContent = err.message; errEl.classList.remove('hidden');
     } finally { btn.disabled = false; btnText.textContent = 'Guardar'; }
   });
+
+  // ── Borrar transacción ────────────────────────────────
+  window.borrarTransaccion = async function(id) {
+    if (!confirm('¿Borrar este gasto?')) return;
+    try {
+      await apiFetch(`/api/transactions/${id}`, { method: 'DELETE' });
+      const tx = window.NixState.transactions.find(t => t.id === id);
+      if (tx) {
+        const acc = window.NixState.accounts.find(a => a.id === tx.account_id);
+        if (acc) acc.current_balance = parseFloat(acc.current_balance) - parseFloat(tx.amount);
+      }
+      window.NixState.transactions = window.NixState.transactions.filter(t => t.id !== id);
+      refreshSaldos(); renderTransacciones(); renderCuentas(); renderCuentasEditar();
+      showToast('🗑 Gasto eliminado');
+    } catch (err) { showToast('❌ ' + err.message, 'text-red-400'); }
+  };
 
   // ── Arrancar ──────────────────────────────────────────
   if (getSession()) {
