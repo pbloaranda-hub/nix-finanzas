@@ -141,13 +141,27 @@
 
     <!-- Panel Importar -->
     <div id="panel-importar" class="panel hidden space-y-4">
+      <!-- PDF Estado de cuenta -->
       <div class="card">
-        <label class="text-sm font-medium">📎 Extracto BBVA (CSV)</label>
+        <label class="text-sm font-medium">📄 Estado de cuenta BBVA (PDF)</label>
+        <select id="importarCuentaPDF" class="input-slate mt-2"></select>
+        <label class="btn-outline w-full flex items-center justify-center gap-2 mt-2 cursor-pointer">
+          <i data-lucide="upload" class="w-4 h-4"></i> <span id="pdfLabel">Seleccionar PDF</span>
+          <input type="file" id="pdfInput" accept="application/pdf" class="hidden">
+        </label>
+        <button id="ejecutarPDF" class="btn-primary w-full mt-2 flex items-center justify-center gap-2" disabled>
+          <i data-lucide="rotate-cw" class="w-4 h-4"></i> Importar PDF
+        </button>
+        <div id="pdfResult" class="text-xs text-green-400 mt-2"></div>
+      </div>
+      <!-- CSV manual -->
+      <div class="card">
+        <label class="text-sm font-medium">📎 CSV manual (fecha, monto, descripción)</label>
         <select id="importarCuenta" class="input-slate mt-2"></select>
-        <textarea id="bbvaCsvInput" rows="6" class="input-slate mt-2 text-sm"
+        <textarea id="bbvaCsvInput" rows="4" class="input-slate mt-2 text-sm"
           placeholder="15/03/2025, -1250, SUPERMERCADO&#10;14/03/2025, 3400, SUELDO"></textarea>
-        <button id="ejecutarParser" class="btn-primary w-full mt-3 flex items-center justify-center gap-2">
-          <i data-lucide="rotate-cw" class="w-4 h-4"></i> Importar como PENDING
+        <button id="ejecutarParser" class="btn-primary w-full mt-2 flex items-center justify-center gap-2">
+          <i data-lucide="rotate-cw" class="w-4 h-4"></i> Importar CSV
         </button>
         <div id="parserResult" class="text-xs text-green-400 mt-2"></div>
       </div>
@@ -333,7 +347,7 @@
 
   function populateSelects() {
     const accounts = window.NixState.accounts;
-    ['cuentaGasto', 'importarCuenta'].forEach(id => {
+    ['cuentaGasto', 'importarCuenta', 'importarCuentaPDF'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
     });
@@ -492,6 +506,86 @@
       renderTransacciones();
     } catch (err) {
       resultEl.textContent = '❌ ' + err.message;
+    } finally { btn.disabled = false; }
+  });
+
+  // ── Importar PDF BBVA ─────────────────────────────────
+  let pdfTextCached = null;
+
+  document.getElementById('pdfInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    document.getElementById('pdfLabel').textContent = file.name;
+    // Leer el PDF como ArrayBuffer y enviar al worker para extraer texto
+    // El worker no puede usar pdftotext, así que enviamos el texto extraído localmente
+    // En el navegador usamos pdf.js para extraer el texto
+    pdfTextCached = null;
+    document.getElementById('pdfResult').textContent = 'Leyendo PDF…';
+    try {
+      // Cargar pdf.js dinámicamente si no está disponible
+      if (!window.pdfjsLib) {
+        await new Promise((res, rej) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+          s.onload = res; s.onerror = rej;
+          document.head.appendChild(s);
+        });
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        // Reconstruir líneas con posición X para mantener columnas
+        const items = content.items.sort((a, b) => {
+          const diffY = Math.round(b.transform[5]) - Math.round(a.transform[5]);
+          return diffY !== 0 ? diffY : a.transform[4] - b.transform[4];
+        });
+        let lastY = null, line = '';
+        for (const item of items) {
+          const y = Math.round(item.transform[5]);
+          const x = Math.round(item.transform[4]);
+          if (lastY !== null && Math.abs(y - lastY) > 3) {
+            fullText += line + '\n';
+            line = ' '.repeat(Math.max(0, Math.floor(x / 5)));
+          } else if (line.length > 0) {
+            line += ' ';
+          }
+          line += item.str;
+          lastY = y;
+        }
+        if (line) fullText += line + '\n';
+      }
+      pdfTextCached = fullText;
+      document.getElementById('ejecutarPDF').disabled = false;
+      document.getElementById('pdfResult').textContent = '✅ PDF leído, listo para importar';
+    } catch (err) {
+      document.getElementById('pdfResult').textContent = '❌ Error leyendo PDF: ' + err.message;
+    }
+  });
+
+  document.getElementById('ejecutarPDF').addEventListener('click', async () => {
+    const account_id = document.getElementById('importarCuentaPDF').value;
+    const resultEl   = document.getElementById('pdfResult');
+    const btn        = document.getElementById('ejecutarPDF');
+    if (!pdfTextCached) { resultEl.textContent = '⚠️ Selecciona un PDF primero'; return; }
+    btn.disabled = true; resultEl.textContent = 'Importando…';
+    try {
+      const res = await apiFetch('/api/import/bbva-pdf', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pdfText: pdfTextCached, account_id }),
+      });
+      resultEl.textContent = `✅ ${res.imported} movimientos importados`;
+      resultEl.className = 'text-xs text-green-400 mt-2';
+      const txRes = await apiFetch('/api/transactions?limit=50');
+      window.NixState.transactions = txRes?.transactions || [];
+      renderTransacciones();
+    } catch (err) {
+      resultEl.textContent = '❌ ' + err.message;
+      resultEl.className = 'text-xs text-red-400 mt-2';
     } finally { btn.disabled = false; }
   });
 
