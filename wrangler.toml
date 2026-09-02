@@ -1,0 +1,15 @@
+name = "nix-finanzas"
+main = "src/worker.js"
+compatibility_date = "2025-03-11"
+account_id = "a7d1838ca81843aa25bad4bf5fcc5e12"
+[assets]
+directory = "./dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "finanzas-db"
+database_id = "87f6772f-8eb2-4e89-8a17-6348b3ba4230"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "finanzas-attachments"
